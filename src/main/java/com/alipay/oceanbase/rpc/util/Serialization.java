@@ -893,6 +893,27 @@ public class Serialization {
     }
 
     /**
+     * Decode a binary column directly to byte[] without creating an ObBytesString.
+     * @param buf input data
+     * @return decoded binary column
+     */
+    public static byte[] decodeBinaryColumn(ByteBuf buf) {
+        int dataLen = decodeVi32(buf);
+        if (dataLen < 0 || dataLen > buf.readableBytes() - 1) {
+            throw new IllegalArgumentException("invalid binary column length: " + dataLen
+                                               + ", readable bytes: " + buf.readableBytes());
+        }
+
+        byte[] content = new byte[dataLen];
+        buf.readBytes(content);
+        byte terminator = buf.readByte();
+        if (terminator != 0) {
+            throw new IllegalArgumentException("invalid binary column terminator: " + terminator);
+        }
+        return content;
+    }
+
+    /**
      * Decode bytes
      * @param buf input data
      * @return output data

@@ -1976,7 +1976,9 @@ public enum ObObjType {
     */
 
     private int                            value;
-    private static Map<Integer, ObObjType> map = new HashMap<Integer, ObObjType>();
+    // Object types encoded as i8 use the array fast path; extended type ids use the map.
+    private static final ObObjType[]             VALUE_LOOKUP = new ObObjType[128];
+    private static final Map<Integer, ObObjType> EXTENDED_VALUE_LOOKUP = new HashMap<Integer, ObObjType>();
 
     ObObjType(int value) {
         this.value = value;
@@ -1984,7 +1986,17 @@ public enum ObObjType {
 
     static {
         for (ObObjType type : ObObjType.values()) {
-            map.put(type.value, type);
+            int value = type.value;
+            if (value < 0) {
+                throw new IllegalStateException("ObObjType value must not be negative: " + value);
+            } else if (value < VALUE_LOOKUP.length) {
+                if (VALUE_LOOKUP[value] != null) {
+                    throw new IllegalStateException("duplicate ObObjType value: " + value);
+                }
+                VALUE_LOOKUP[value] = type;
+            } else if (EXTENDED_VALUE_LOOKUP.put(value, type) != null) {
+                throw new IllegalStateException("duplicate ObObjType value: " + value);
+            }
         }
     }
 
@@ -2039,7 +2051,11 @@ public enum ObObjType {
      * Value of.
      */
     public static ObObjType valueOf(int value) {
-        return map.get(value);
+        if (value < 0) {
+            return null;
+        }
+        return value < VALUE_LOOKUP.length ? VALUE_LOOKUP[value] : EXTENDED_VALUE_LOOKUP
+            .get(value);
     }
 
     /*

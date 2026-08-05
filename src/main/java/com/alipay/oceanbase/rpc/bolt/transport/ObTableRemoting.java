@@ -33,16 +33,26 @@ import org.slf4j.Logger;
 
 import static com.alipay.oceanbase.rpc.protocol.packet.ObCompressType.INVALID_COMPRESSOR;
 import static com.alipay.oceanbase.rpc.protocol.packet.ObCompressType.NONE_COMPRESSOR;
+import static com.alipay.oceanbase.rpc.property.Property.RPC_RESPONSE_CHECKSUM_ENABLED;
 
 public class ObTableRemoting extends BaseRemoting {
 
     private static final Logger logger = TableClientLoggerFactory.getLogger(ObTableRemoting.class);
+    private final boolean       responseChecksumEnabled;
 
     /*
      * Ob table remoting.
      */
     public ObTableRemoting(CommandFactory commandFactory) {
+        this(commandFactory, RPC_RESPONSE_CHECKSUM_ENABLED.getDefaultBoolean());
+    }
+
+    /*
+     * Ob table remoting.
+     */
+    public ObTableRemoting(CommandFactory commandFactory, boolean responseChecksumEnabled) {
         super(commandFactory);
+        this.responseChecksumEnabled = responseChecksumEnabled;
     }
 
     /*
@@ -102,11 +112,8 @@ public class ObTableRemoting extends BaseRemoting {
                 throw new FeatureNotSupportedException(errMessage);
             }
             ByteBuf buf = response.getPacketContentBuf();
-            // verify checksum
-            long expected_checksum = response.getHeader().getChecksum();
-            byte[] content = new byte[buf.readableBytes()];
-            buf.getBytes(buf.readerIndex(), content);
-            if (ObPureCrc32C.calculate(content) != expected_checksum) {
+            // optionally verify response checksum
+            if (!isResponseChecksumValid(buf, response.getHeader().getChecksum())) {
                 String errMessage = TraceUtil.formatTraceMessage(conn, request,
                     "get response with checksum error: " + response.getMessage());
                 ExceptionUtil.throwObTableTransportException(errMessage,
@@ -177,6 +184,15 @@ public class ObTableRemoting extends BaseRemoting {
             // Very important to release ByteBuf memory
             response.releaseByteBuf();
         }
+    }
+
+    boolean isResponseChecksumValid(ByteBuf buf, long expectedChecksum) {
+        if (!responseChecksumEnabled) {
+            return true;
+        }
+        byte[] content = new byte[buf.readableBytes()];
+        buf.getBytes(buf.readerIndex(), content);
+        return ObPureCrc32C.calculate(content) == expectedChecksum;
     }
 
     @Override
