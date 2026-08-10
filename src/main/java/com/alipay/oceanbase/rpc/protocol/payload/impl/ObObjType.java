@@ -1270,7 +1270,9 @@ public enum ObObjType {
          */
         @Override
         public byte[] encode(Object obj) {
-            if (obj instanceof byte[]) {
+            if (obj instanceof ObBytesString) {
+                return Serialization.encodeBytesString((ObBytesString) obj);
+            } else if (obj instanceof byte[]) {
                 ObBytesString bytesString = new ObBytesString((byte[]) obj);
                 return Serialization.encodeBytesString(bytesString);
             } else if (obj instanceof ObVString) {
@@ -1282,7 +1284,9 @@ public enum ObObjType {
 
         @Override
         public void encode(ObByteBuf buf, Object obj) {
-            if (obj instanceof byte[]) {
+            if (obj instanceof ObBytesString) {
+                Serialization.encodeBytesString(buf, (ObBytesString) obj);
+            } else if (obj instanceof byte[]) {
                 ObBytesString bytesString = new ObBytesString((byte[]) obj);
                 Serialization.encodeBytesString(buf, bytesString);
             } else if (obj instanceof ObVString) {
@@ -2028,6 +2032,8 @@ public enum ObObjType {
             return ObVarcharType;
         } else if (object instanceof byte[]) {
             return ObVarcharType;
+        } else if (object instanceof ObBytesString) {
+            return ObVarcharType;
         } else if (object instanceof ObVString) {
             return ObVarcharType;
         } else if (object instanceof Double) {
@@ -2129,7 +2135,9 @@ public enum ObObjType {
      * Get text encoded size.
      */
     public static int getTextEncodedSize(Object obj) {
-        if (obj instanceof byte[]) {
+        if (obj instanceof ObBytesString) {
+            return Serialization.getNeedBytes((ObBytesString) obj);
+        } else if (obj instanceof byte[]) {
             ObBytesString bytesString = new ObBytesString((byte[]) obj);
             return Serialization.getNeedBytes(bytesString);
         } else if (obj instanceof ObVString) {

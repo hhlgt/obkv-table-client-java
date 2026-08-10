@@ -24,6 +24,7 @@ import com.alipay.oceanbase.rpc.table.ObFTSParams;
 import com.alipay.oceanbase.rpc.table.ObHBaseParams;
 import com.alipay.oceanbase.rpc.table.ObKVParams;
 import com.alipay.oceanbase.rpc.table.ObKVParamsBase;
+import com.alipay.oceanbase.rpc.util.ObByteBuf;
 import com.alipay.oceanbase.rpc.util.ObBytesString;
 import com.alipay.oceanbase.rpc.util.Serialization;
 import io.netty.buffer.ByteBuf;
@@ -60,6 +61,11 @@ public class ObTableQueryPayloadTest {
         ObHTableFilter obHTableFilter = getObHTableFilter();
 
         byte[] bytes = obHTableFilter.encode();
+        ObByteBuf obByteBuf = new ObByteBuf(bytes.length);
+        obHTableFilter.encode(obByteBuf);
+        assertEquals(bytes.length, obByteBuf.pos);
+        assertArrayEquals(bytes, obByteBuf.bytes);
+
         ByteBuf buf = PooledByteBufAllocator.DEFAULT.buffer();
         buf.writeBytes(bytes);
 
@@ -68,6 +74,16 @@ public class ObTableQueryPayloadTest {
 
         checkObHTableFilter(obHTableFilter, newObHTableFilter);
 
+    }
+
+    @Test
+    public void test_ObHTableFilterResetPayloadSize() {
+        ObHTableFilter obHTableFilter = new ObHTableFilter();
+        long emptyFilterSize = obHTableFilter.getPayloadContentSize();
+
+        obHTableFilter.setFilterString("123".getBytes());
+
+        assertEquals(emptyFilterSize + 3, obHTableFilter.getPayloadContentSize());
     }
 
     @Test

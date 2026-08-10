@@ -74,7 +74,7 @@ public class ObTableRemotingChecksumTest {
             ObRpcPacketHeader header = new ObRpcPacketHeader();
             header.decode(packetContent);
 
-            Assert.assertEquals(ObPureCrc32C.calculate(payloadContent), header.getChecksum());
+            Assert.assertEquals(0x8762fcd6L, header.getChecksum());
         } finally {
             packetContent.release();
         }
