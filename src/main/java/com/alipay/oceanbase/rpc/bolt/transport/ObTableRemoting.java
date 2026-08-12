@@ -22,6 +22,10 @@ import com.alipay.oceanbase.rpc.bolt.protocol.ObTablePacketCode;
 import com.alipay.oceanbase.rpc.exception.*;
 import com.alipay.oceanbase.rpc.protocol.packet.ObCompressType;
 import com.alipay.oceanbase.rpc.protocol.payload.*;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.OHOperationType;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableEntityType;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableLSOpRequest;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableLSOpResult;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.login.ObTableLoginRequest;
 import com.alipay.oceanbase.rpc.util.ObPureCrc32C;
 import com.alipay.oceanbase.rpc.util.TableClientLoggerFactory;
@@ -171,6 +175,16 @@ public class ObTableRemoting extends BaseRemoting {
                 String errMessage = TraceUtil.formatTraceMessage(conn, response,
                     "receive unexpected command code: " + response.getCmdCode().value());
                 throw new ObTableUnexpectedException(errMessage, resultCode.getRcode());
+            }
+            if (payload instanceof ObTableLSOpResult && request instanceof ObTableLSOpRequest) {
+                ObTableLSOpRequest lsRequest = (ObTableLSOpRequest) request;
+                OHOperationType hbaseOpType = lsRequest.getHbaseOpType();
+                boolean eligibleHBaseBatchGet = lsRequest.getEntityType() == ObTableEntityType.HKV
+                    && (hbaseOpType == OHOperationType.GET_LIST
+                        || hbaseOpType == OHOperationType.BATCH);
+                ((ObTableLSOpResult) payload).setHBaseBatchGetCompactDecoderEnabled(
+                    eligibleHBaseBatchGet
+                    && lsRequest.isHBaseBatchGetCompactDecoderEnabled());
             }
             try {
                 payload.decode(buf);

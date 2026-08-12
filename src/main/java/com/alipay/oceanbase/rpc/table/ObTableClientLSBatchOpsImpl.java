@@ -70,6 +70,7 @@ public class ObTableClientLSBatchOpsImpl extends AbstractTableBatchOps {
     private boolean               serverCanRetry          = false;
     private boolean               needTabletId            = false;
     protected OHOperationType     hbaseOpType             = OHOperationType.INVALID;
+    private boolean               hbaseBatchGetCompactDecoderEnabled = false;
     private List<ObTableSingleOp> batchOperation;
 
     /*
@@ -96,6 +97,10 @@ public class ObTableClientLSBatchOpsImpl extends AbstractTableBatchOps {
 
     public void setHbaseOpType(OHOperationType hbaseOpType) {
         this.hbaseOpType = hbaseOpType;
+    }
+
+    public void setHBaseBatchGetCompactDecoderEnabled(boolean enabled) {
+        this.hbaseBatchGetCompactDecoderEnabled = enabled;
     }
 
     /*
@@ -618,6 +623,8 @@ public class ObTableClientLSBatchOpsImpl extends AbstractTableBatchOps {
            tableLsOpRequest.setConsistencyLevel(ObReadConsistency.STRONG);
        }
        tableLsOpRequest.setHbaseOpType(hbaseOpType);
+       tableLsOpRequest.setHBaseBatchGetCompactDecoderEnabled(
+           hbaseBatchGetCompactDecoderEnabled);
 
         ObTableLSOpResult subLSOpResult;
         boolean needRefreshPartitionLocation = false;

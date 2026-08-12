@@ -37,7 +37,7 @@ public final class ObHBaseCellBatch {
     private final byte[][]   values;
     private final ObObjMeta[] metas = new ObObjMeta[HBASE_KQTV_COLUMN_COUNT];
 
-    ObHBaseCellBatch(int size) {
+    public ObHBaseCellBatch(int size) {
         if (size < 0) {
             throw new IllegalArgumentException("negative HBase cell batch size: " + size);
         }
@@ -47,7 +47,7 @@ public final class ObHBaseCellBatch {
         this.values = new byte[size][];
     }
 
-    void setMeta(int columnIndex, ObObjMeta meta) {
+    public void setMeta(int columnIndex, ObObjMeta meta) {
         metas[columnIndex] = meta;
     }
 
@@ -55,7 +55,7 @@ public final class ObHBaseCellBatch {
         return metas[columnIndex];
     }
 
-    void setCell(int index, byte[] rowKey, byte[] qualifier, long timestamp, byte[] value) {
+    public void setCell(int index, byte[] rowKey, byte[] qualifier, long timestamp, byte[] value) {
         rowKeys[index] = rowKey;
         qualifiers[index] = qualifier;
         timestamps[index] = timestamp;

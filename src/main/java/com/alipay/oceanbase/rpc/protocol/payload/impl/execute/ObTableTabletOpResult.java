@@ -31,6 +31,7 @@ import static com.alipay.oceanbase.rpc.util.Serialization.getObUniVersionHeaderL
 public class ObTableTabletOpResult extends AbstractPayload {
     private List<ObTableSingleOpResult> results = new ArrayList<ObTableSingleOpResult>();
     private List<String> propertiesColumnNames = new ArrayList<>();
+    private boolean hbaseBatchGetCompactDecoderEnabled = false;
 
 
     @Override
@@ -81,6 +82,8 @@ public class ObTableTabletOpResult extends AbstractPayload {
         for (int i = 0; i < len; i++) {
             ObTableSingleOpResult obTableSingleOpResult = new ObTableSingleOpResult();
             obTableSingleOpResult.setPropertiesColumnNames(propertiesColumnNames);
+            obTableSingleOpResult.setHBaseBatchGetCompactDecoderEnabled(
+                hbaseBatchGetCompactDecoderEnabled);
             obTableSingleOpResult.decode(buf);
             results.add(obTableSingleOpResult);
         }
@@ -126,5 +129,8 @@ public class ObTableTabletOpResult extends AbstractPayload {
     public void setPropertiesColumnNames(List<String> propertiesColumnNames) {
         this.propertiesColumnNames = propertiesColumnNames;
     }
-}
 
+    public void setHBaseBatchGetCompactDecoderEnabled(boolean enabled) {
+        this.hbaseBatchGetCompactDecoderEnabled = enabled;
+    }
+}

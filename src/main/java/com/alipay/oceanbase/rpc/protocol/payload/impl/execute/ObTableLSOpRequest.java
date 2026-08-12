@@ -42,6 +42,7 @@ public class ObTableLSOpRequest extends AbstractPayload implements Credentialabl
     protected ObReadConsistency       consistencyLevel = ObReadConsistency.STRONG;
     private ObTableLSOperation        lsOperation      = null;
     protected OHOperationType         hbaseOpType      = OHOperationType.INVALID;
+    private boolean                   hbaseBatchGetCompactDecoderEnabled = false;
 
     /*
      * Get pcode.
@@ -168,6 +169,18 @@ public class ObTableLSOpRequest extends AbstractPayload implements Credentialabl
 
     public void setHbaseOpType(OHOperationType hbaseOpType) {
         this.hbaseOpType = hbaseOpType;
+    }
+
+    public OHOperationType getHbaseOpType() {
+        return hbaseOpType;
+    }
+
+    public void setHBaseBatchGetCompactDecoderEnabled(boolean enabled) {
+        this.hbaseBatchGetCompactDecoderEnabled = enabled;
+    }
+
+    public boolean isHBaseBatchGetCompactDecoderEnabled() {
+        return hbaseBatchGetCompactDecoderEnabled;
     }
 
     /**
