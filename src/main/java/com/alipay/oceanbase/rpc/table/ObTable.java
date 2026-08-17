@@ -79,9 +79,6 @@ public class ObTable extends AbstractObTable implements Lifecycle {
     private volatile boolean      closed      = false;
     private boolean enableRerouting = true;              // only used for init packet factory
 
-    private boolean               responseChecksumEnabled = RPC_RESPONSE_CHECKSUM_ENABLED
-                                                               .getDefaultBoolean();
-
     private ReentrantLock         statusLock  = new ReentrantLock();
     private AtomicBoolean         valid       = new AtomicBoolean(true);
     private boolean               isOdpMode   = false; // default as false
@@ -105,8 +102,7 @@ public class ObTable extends AbstractObTable implements Lifecycle {
                 .configWriteBufferWaterMark(getNettyBufferLowWatermark(),
                     getNettyBufferHighWatermark()).build();
             connectionFactory.init(new ObConnectionEventHandler(new GlobalSwitch()));
-            realClient = new ObTableRemoting(new ObPacketFactory(enableRerouting),
-                responseChecksumEnabled);
+            realClient = new ObTableRemoting(new ObPacketFactory(enableRerouting));
             connectionPool = new ObTableConnectionPool(this, obTableConnectionPoolSize);
             connectionPool.init();
             initialized = true;
@@ -185,8 +181,6 @@ public class ObTable extends AbstractObTable implements Lifecycle {
         nettyCheckWritableEnabled = parseToBoolean(NETTY_CHECK_WRITABLE_ENABLED.getKey(),
             nettyCheckWritableEnabled);
         enableRerouting = parseToBoolean(SERVER_ENABLE_REROUTING.getKey(), enableRerouting);
-        responseChecksumEnabled = parseToBoolean(RPC_RESPONSE_CHECKSUM_ENABLED.getKey(),
-            responseChecksumEnabled);
         maxConnExpiredTime = parseToLong(MAX_CONN_EXPIRED_TIME.getKey(), maxConnExpiredTime);
 
         Object value = this.configs.get("runtime");

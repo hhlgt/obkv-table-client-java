@@ -44,7 +44,7 @@ public class ObTableSingleOpEntity extends AbstractPayload {
     private List<String> aggPropertiesNames = new ArrayList<>();
     private List<ObObj> propertiesValues = new ArrayList<>();
 
-    private boolean hbaseBatchGetCompactDecoderEnabled = false;
+    private boolean decodeHBaseKqtv = false;
     private ObHBaseCellBatch hbaseCellBatch = null;
 
     private static final int HBASE_KQTV_COLUMN_COUNT = 4;
@@ -196,7 +196,7 @@ public class ObTableSingleOpEntity extends AbstractPayload {
             // 4. properties obobj
             propLen = (int) Serialization.decodeVi64(buf);
             int propertiesStartIndex = buf.readerIndex();
-            if (hbaseBatchGetCompactDecoderEnabled && isHBaseKqtvSchema()
+            if (decodeHBaseKqtv && isHBaseKqtvSchema()
                 && (propLen & (HBASE_KQTV_COLUMN_COUNT - 1)) == 0) {
                 hbaseCellBatch = tryDecodeHBaseKqtvBatch(buf, propLen);
                 if (hbaseCellBatch == null) {
@@ -538,8 +538,8 @@ public class ObTableSingleOpEntity extends AbstractPayload {
         return this.propertiesValues;
     }
 
-    public void setHBaseBatchGetCompactDecoderEnabled(boolean enabled) {
-        this.hbaseBatchGetCompactDecoderEnabled = enabled;
+    public void setDecodeHBaseKqtv(boolean decodeHBaseKqtv) {
+        this.decodeHBaseKqtv = decodeHBaseKqtv;
     }
 
     public ObHBaseCellBatch getHBaseCellBatch() {

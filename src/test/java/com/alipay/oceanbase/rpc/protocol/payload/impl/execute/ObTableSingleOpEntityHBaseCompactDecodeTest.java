@@ -45,7 +45,7 @@ public class ObTableSingleOpEntityHBaseCompactDecodeTest {
     }
 
     @Test
-    public void disabledDecoderUsesGenericObObjValues() {
+    public void absentHBaseDecodeContextUsesGenericObObjValues() {
         ObTableSingleOpEntity decoded = decode(newKqtvEntity(), false);
 
         assertNull(decoded.getHBaseCellBatch());
@@ -91,7 +91,7 @@ public class ObTableSingleOpEntityHBaseCompactDecodeTest {
         try {
             ObTableSingleOpEntity decoded = new ObTableSingleOpEntity();
             decoded.setAggPropertiesNames(columns);
-            decoded.setHBaseBatchGetCompactDecoderEnabled(enabled);
+            decoded.setDecodeHBaseKqtv(enabled);
             decoded.decode(buf);
             return decoded;
         } finally {

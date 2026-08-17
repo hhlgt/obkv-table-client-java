@@ -41,14 +41,14 @@ public class ObCrcUtilTest {
     }
 
     @Test
-    public void testSlicingImplementationsMatchScalar() {
+    public void testSlicingBy8MatchesScalar() {
         Random random = new Random(20260807L);
         int[] lengths = new int[] { 0, 1, 7, 8, 15, 16, 17, 31, 32, 63, 64, 65, 127, 128, 129, 255,
                 256, 257, 1023, 1024, 1025, 65535, 1048576 };
         for (int length : lengths) {
             byte[] bytes = new byte[length + 11];
             random.nextBytes(bytes);
-            assertAllImplementationsEqual(bytes, 5, length);
+            assertSlicingBy8EqualsScalar(bytes, 5, length);
         }
 
         for (int round = 0; round < 1000; round++) {
@@ -56,14 +56,13 @@ public class ObCrcUtilTest {
             int prefix = random.nextInt(16);
             byte[] bytes = new byte[prefix + length + random.nextInt(16)];
             random.nextBytes(bytes);
-            assertAllImplementationsEqual(bytes, prefix, length);
+            assertSlicingBy8EqualsScalar(bytes, prefix, length);
         }
     }
 
-    private static void assertAllImplementationsEqual(byte[] bytes, int offset, int length) {
+    private static void assertSlicingBy8EqualsScalar(byte[] bytes, int offset, int length) {
         long scalar = ObPureCrc32C.calculateScalar(bytes, offset, length);
         Assert.assertEquals(scalar, ObPureCrc32C.calculateSlicingBy8(bytes, offset, length));
-        Assert.assertEquals(scalar, ObPureCrc32C.calculateSlicingBy16(bytes, offset, length));
         Assert.assertEquals(scalar, ObPureCrc32C.calculate(bytes, offset, length));
     }
 

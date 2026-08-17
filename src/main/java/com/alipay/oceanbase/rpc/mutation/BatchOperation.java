@@ -54,7 +54,6 @@ public class BatchOperation {
     boolean                     isSameType       = true;
     protected ObTableEntityType entityType       = ObTableEntityType.KV;
     protected OHOperationType   hbaseOpType      = OHOperationType.INVALID;
-    private boolean             hbaseBatchGetCompactDecoderEnabled = false;
     protected ObReadConsistency readConsistency  = null; // BatchOperation 级别的弱读设置
 
     /*
@@ -96,10 +95,6 @@ public class BatchOperation {
 
     public void setHbaseOpType(OHOperationType hbaseOpType) {
         this.hbaseOpType = hbaseOpType;
-    }
-
-    public void setHBaseBatchGetCompactDecoderEnabled(boolean enabled) {
-        this.hbaseBatchGetCompactDecoderEnabled = enabled;
     }
 
     /*
@@ -360,8 +355,6 @@ public class BatchOperation {
             batchOps.setServerCanRetry(serverCanRetry);
             batchOps.setNeedTabletId(needTabletId);
             batchOps.setHbaseOpType(hbaseOpType);
-            batchOps.setHBaseBatchGetCompactDecoderEnabled(
-                hbaseBatchGetCompactDecoderEnabled);
             if (readConsistency != null) {
                 isWeakRead = (readConsistency == ObReadConsistency.WEAK);
             } else {

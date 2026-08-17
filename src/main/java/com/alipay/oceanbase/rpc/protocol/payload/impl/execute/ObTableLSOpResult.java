@@ -32,7 +32,7 @@ public class ObTableLSOpResult extends AbstractPayload {
 
     private List<ObTableTabletOpResult> results = new ArrayList<ObTableTabletOpResult>();
     private List<String> propertiesColumnNames = new ArrayList<>();
-    private boolean hbaseBatchGetCompactDecoderEnabled = false;
+    private boolean decodeHBaseKqtv = false;
 
     /*
      * Get pcode.
@@ -97,8 +97,7 @@ public class ObTableLSOpResult extends AbstractPayload {
         for (int i = 0; i < len; i++) {
             ObTableTabletOpResult tabletOpResult = new ObTableTabletOpResult();
             tabletOpResult.setPropertiesColumnNames(this.propertiesColumnNames);
-            tabletOpResult.setHBaseBatchGetCompactDecoderEnabled(
-                hbaseBatchGetCompactDecoderEnabled);
+            tabletOpResult.setDecodeHBaseKqtv(decodeHBaseKqtv);
             tabletOpResult.decode(buf);
             results.add(tabletOpResult);
         }
@@ -148,8 +147,8 @@ public class ObTableLSOpResult extends AbstractPayload {
         this.results.addAll(results);
     }
 
-    public void setHBaseBatchGetCompactDecoderEnabled(boolean enabled) {
-        this.hbaseBatchGetCompactDecoderEnabled = enabled;
+    public void setDecodeHBaseKqtv(boolean decodeHBaseKqtv) {
+        this.decodeHBaseKqtv = decodeHBaseKqtv;
     }
 
 }

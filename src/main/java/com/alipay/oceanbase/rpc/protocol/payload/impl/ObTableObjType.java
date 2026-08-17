@@ -203,7 +203,6 @@ public enum ObTableObjType {
     };
 
     private static final int                    LOOKUP_SIZE = 128;
-    private static final int                    MAX_TYPE_ID = 0xFF;
     private int                                 value;
     // Keep current low ids on the fast path; reserve a map for future ids outside the array.
     private static final ObTableObjType[]       VALUE_LOOKUP = new ObTableObjType[LOOKUP_SIZE];
@@ -222,7 +221,7 @@ public enum ObTableObjType {
     }
 
     private static void registerLookup(int value, ObTableObjType type) {
-        if (value < 0 || value > MAX_TYPE_ID) {
+        if (value < 0) {
             throw new IllegalStateException("Invalid table object type id: " + value);
         }
         if (value < VALUE_LOOKUP.length) {

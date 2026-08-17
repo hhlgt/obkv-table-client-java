@@ -33,7 +33,7 @@ public class ObTableSingleOpResult extends AbstractPayload {
     private String                executeHost;
     private int                   executePort;
     private List<String>          propertiesColumnNames = new ArrayList<>();
-    private boolean               hbaseBatchGetCompactDecoderEnabled = false;
+    private boolean               decodeHBaseKqtv = false;
     /*
      * Get pcode.
      */
@@ -93,8 +93,8 @@ public class ObTableSingleOpResult extends AbstractPayload {
 
             // 3. decode Entity
             this.entity.setAggPropertiesNames(propertiesColumnNames);
-            this.entity.setHBaseBatchGetCompactDecoderEnabled(
-                hbaseBatchGetCompactDecoderEnabled && operationType == ObTableOperationType.GET);
+            this.entity.setDecodeHBaseKqtv(
+                decodeHBaseKqtv && operationType == ObTableOperationType.GET);
             this.entity.decode(buf);
 
             // 4. decode affected rows
@@ -161,8 +161,8 @@ public class ObTableSingleOpResult extends AbstractPayload {
         this.entity = entity;
     }
 
-    public void setHBaseBatchGetCompactDecoderEnabled(boolean enabled) {
-        this.hbaseBatchGetCompactDecoderEnabled = enabled;
+    public void setDecodeHBaseKqtv(boolean decodeHBaseKqtv) {
+        this.decodeHBaseKqtv = decodeHBaseKqtv;
     }
 
     /*

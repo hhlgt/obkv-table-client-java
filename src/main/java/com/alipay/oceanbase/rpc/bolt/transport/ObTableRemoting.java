@@ -27,7 +27,6 @@ import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableEntityType;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableLSOpRequest;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableLSOpResult;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.login.ObTableLoginRequest;
-import com.alipay.oceanbase.rpc.util.ObPureCrc32C;
 import com.alipay.oceanbase.rpc.util.TableClientLoggerFactory;
 import com.alipay.oceanbase.rpc.util.TraceUtil;
 import com.alipay.remoting.*;
@@ -37,26 +36,16 @@ import org.slf4j.Logger;
 
 import static com.alipay.oceanbase.rpc.protocol.packet.ObCompressType.INVALID_COMPRESSOR;
 import static com.alipay.oceanbase.rpc.protocol.packet.ObCompressType.NONE_COMPRESSOR;
-import static com.alipay.oceanbase.rpc.property.Property.RPC_RESPONSE_CHECKSUM_ENABLED;
 
 public class ObTableRemoting extends BaseRemoting {
 
     private static final Logger logger = TableClientLoggerFactory.getLogger(ObTableRemoting.class);
-    private final boolean       responseChecksumEnabled;
 
     /*
      * Ob table remoting.
      */
     public ObTableRemoting(CommandFactory commandFactory) {
-        this(commandFactory, RPC_RESPONSE_CHECKSUM_ENABLED.getDefaultBoolean());
-    }
-
-    /*
-     * Ob table remoting.
-     */
-    public ObTableRemoting(CommandFactory commandFactory, boolean responseChecksumEnabled) {
         super(commandFactory);
-        this.responseChecksumEnabled = responseChecksumEnabled;
     }
 
     /*
@@ -116,14 +105,6 @@ public class ObTableRemoting extends BaseRemoting {
                 throw new FeatureNotSupportedException(errMessage);
             }
             ByteBuf buf = response.getPacketContentBuf();
-            // optionally verify response checksum
-            if (!isResponseChecksumValid(buf, response.getHeader().getChecksum())) {
-                String errMessage = TraceUtil.formatTraceMessage(conn, request,
-                    "get response with checksum error: " + response.getMessage());
-                ExceptionUtil.throwObTableTransportException(errMessage,
-                    TransportCodes.BOLT_CHECKSUM_ERR);
-                return null;
-            }
 
             // decode ResultCode for response packet
             boolean isRoutingWrong = false;
@@ -182,9 +163,7 @@ public class ObTableRemoting extends BaseRemoting {
                 boolean eligibleHBaseBatchGet = lsRequest.getEntityType() == ObTableEntityType.HKV
                     && (hbaseOpType == OHOperationType.GET_LIST
                         || hbaseOpType == OHOperationType.BATCH);
-                ((ObTableLSOpResult) payload).setHBaseBatchGetCompactDecoderEnabled(
-                    eligibleHBaseBatchGet
-                    && lsRequest.isHBaseBatchGetCompactDecoderEnabled());
+                ((ObTableLSOpResult) payload).setDecodeHBaseKqtv(eligibleHBaseBatchGet);
             }
             try {
                 payload.decode(buf);
@@ -198,15 +177,6 @@ public class ObTableRemoting extends BaseRemoting {
             // Very important to release ByteBuf memory
             response.releaseByteBuf();
         }
-    }
-
-    boolean isResponseChecksumValid(ByteBuf buf, long expectedChecksum) {
-        if (!responseChecksumEnabled) {
-            return true;
-        }
-        byte[] content = new byte[buf.readableBytes()];
-        buf.getBytes(buf.readerIndex(), content);
-        return ObPureCrc32C.calculate(content) == expectedChecksum;
     }
 
     @Override

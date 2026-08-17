@@ -121,9 +121,6 @@ public enum Property {
 
     RPC_OPERATION_TIMEOUT("rpc.operation.timeout", 2000L, "OB内部执行RPC请求的超时时间"),
 
-    RPC_RESPONSE_CHECKSUM_ENABLED("rpc.response.checksum.enabled", false,
-                                  "是否校验RPC响应CRC32C"),
-
     // [ObTable][CONNECTION_POOL]
     SERVER_CONNECTION_POOL_SIZE("server.connection.pool.size", 1, "单个SERVER的连接数"),
 

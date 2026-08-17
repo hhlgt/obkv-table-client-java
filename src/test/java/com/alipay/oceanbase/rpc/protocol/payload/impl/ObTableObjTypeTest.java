@@ -56,14 +56,16 @@ public class ObTableObjTypeTest {
         Map<Integer, ObTableObjType> overflow = (Map<Integer, ObTableObjType>) overflowLookup
             .get(null);
 
-        int[] overflowIds = { 128, 255 };
+        int[] overflowIds = { 128, 255, 256 };
         for (int overflowId : overflowIds) {
             try {
                 registerLookup.invoke(null, overflowId, ObTableObjType.ObTableInvalidType);
                 assertSame(ObTableObjType.ObTableInvalidType, ObTableObjType.valueOf(overflowId));
-                ByteBuf encodedType = Unpooled.wrappedBuffer(new byte[] { (byte) overflowId });
-                assertSame(ObTableObjType.ObTableInvalidType,
-                    ObTableSerialUtil.decodeTableObjType(encodedType));
+                if (overflowId <= 0xFF) {
+                    ByteBuf encodedType = Unpooled.wrappedBuffer(new byte[] { (byte) overflowId });
+                    assertSame(ObTableObjType.ObTableInvalidType,
+                        ObTableSerialUtil.decodeTableObjType(encodedType));
+                }
             } finally {
                 overflow.remove(overflowId);
             }

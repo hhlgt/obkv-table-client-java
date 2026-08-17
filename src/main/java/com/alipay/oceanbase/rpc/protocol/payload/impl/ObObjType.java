@@ -2154,7 +2154,7 @@ public enum ObObjType {
                                           ObCollationType collationType) {
         if (collationType == ObCollationType.CS_TYPE_BINARY) {
             if (object instanceof ObBytesString) {
-                return ((ObBytesString) object).bytes;
+                return materializeBytesString((ObBytesString) object);
             }
 
             if (object instanceof byte[]) {
@@ -2174,7 +2174,8 @@ public enum ObObjType {
                 return ((String) object).getBytes();
             }
             if (object instanceof ObBytesString) {
-                return (Serialization.decodeVString(((ObBytesString) object).bytes)).getBytes();
+                return Serialization.decodeVString(materializeBytesString((ObBytesString) object))
+                    .getBytes();
             }
 
             if (object instanceof byte[]) {
@@ -2225,7 +2226,7 @@ public enum ObObjType {
                 return (String) object;
             }
             if (object instanceof ObBytesString) {
-                return Serialization.decodeVString(((ObBytesString) object).bytes);
+                return Serialization.decodeVString(materializeBytesString((ObBytesString) object));
             }
 
             if (object instanceof byte[]) {
@@ -2246,6 +2247,14 @@ public enum ObObjType {
 
         throw new IllegalArgumentException(obObjType.name() + "can not parseToComparable argument:"
                                            + object);
+    }
+
+    private static byte[] materializeBytesString(ObBytesString bytesString) {
+        if (bytesString.offset == 0 && bytesString.length() == bytesString.bytes.length) {
+            return bytesString.bytes;
+        }
+        return Arrays.copyOfRange(bytesString.bytes, bytesString.offset,
+            bytesString.offset + bytesString.length());
     }
 
     /*
