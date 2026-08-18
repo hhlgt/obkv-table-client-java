@@ -19,6 +19,7 @@ package com.alipay.oceanbase.rpc.location.model;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.exception.ObTableCloseException;
@@ -36,6 +37,7 @@ public class TableRoster {
     private Properties properties = new Properties();
     private Map<String, Object> tableConfigs = new HashMap<>();
     private ObTableClientType clientType;
+    private Consumer<ObServerAddr> failureHandler;
     /*
      * ServerAddr(all) -> ObTableConnection
      */
@@ -64,6 +66,9 @@ public class TableRoster {
     }
     public void setTableConfigs(Map<String, Object> tableConfigs) {
         this.tableConfigs = tableConfigs;
+    }
+    public void setFailureHandler(Consumer<ObServerAddr> failureHandler) {
+        this.failureHandler = failureHandler;
     }
     public ObTable getTable(ObServerAddr addr) {
         return tables.get(addr);
@@ -101,7 +106,8 @@ public class TableRoster {
 
             ObTable obTable = new ObTable.Builder(addr.getIp(), addr.getSvrPort()) //
                     .setLoginInfo(tenantName, userName, password, database, clientType) //
-                    .setProperties(properties).setConfigs(tableConfigs).setObServerAddr(addr).build();
+                    .setProperties(properties).setConfigs(tableConfigs).setObServerAddr(addr)
+                    .setFailureHandler(failureHandler).build();
             ObTable oldObTable = tables.putIfAbsent(addr, obTable);
             logger.warn("add new table addr, {}", addr.toString());
             if (oldObTable != null) { // maybe create two ob table concurrently, close current ob table

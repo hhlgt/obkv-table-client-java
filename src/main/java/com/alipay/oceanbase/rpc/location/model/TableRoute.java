@@ -64,7 +64,7 @@ public class TableRoute {
     private IndexLocations            indexLocations               = null;                           // global index location
     private TableGroupCache           tableGroupCache              = null;
     private OdpInfo                   odpInfo                      = null;
-    private RouteTableRefresher       routeRefresher               = null;
+    private volatile RouteTableRefresher routeRefresher               = null;
     private long                      lastRefreshMetadataTimestamp = -1;
     public final Lock                 refreshTableRosterLock       = new ReentrantLock();
 
@@ -348,7 +348,8 @@ public class TableRoute {
                         tableClient.getPassword(), tableClient.getDatabase(),
                         tableClient.getClientType(runningMode))
                     .setProperties(tableClient.getProperties())
-                    .setConfigs(tableClient.getTableConfigs()).setObServerAddr(addr).build();
+                    .setConfigs(tableClient.getTableConfigs()).setObServerAddr(addr)
+                    .setFailureHandler(this::reportObServerFailure).build();
                 addr2Table.put(addr, obTable);
                 servers.add(addr);
             } catch (Exception e) {
@@ -363,6 +364,7 @@ public class TableRoute {
             tableClient.getUserName(), tableClient.getPassword(), tableClient.getDatabase(),
             tableClient.getClientType(runningMode), tableClient.getProperties(),
             tableClient.getTableConfigs());
+        this.tableRoster.setFailureHandler(this::reportObServerFailure);
         this.tableRoster.setTables(addr2Table);
         this.serverRoster.reset(servers);
 
@@ -410,7 +412,15 @@ public class TableRoute {
 
     public void launchRouteRefresher() {
         routeRefresher = new RouteTableRefresher(tableClient, sysUA);
+        routeRefresher.refreshActiveServers(serverRoster.getMembers());
         routeRefresher.start();
+    }
+
+    public void reportObServerFailure(ObServerAddr addr) {
+        RouteTableRefresher refresher = routeRefresher;
+        if (refresher != null) {
+            refresher.addIntoSuspectIPs(addr);
+        }
     }
 
     public void removeObServer(ObServerAddr addr) {
@@ -480,6 +490,10 @@ public class TableRoute {
         // update new ob table and get new server address
         List<ObServerAddr> servers = tableRoster.refreshTablesAndGetNewServers(replicaLocations);
         serverRoster.reset(servers);
+        RouteTableRefresher refresher = routeRefresher;
+        if (refresher != null) {
+            refresher.refreshActiveServers(servers);
+        }
 
         // 2. Get Server LDC info for weak read consistency.
         success = false;
