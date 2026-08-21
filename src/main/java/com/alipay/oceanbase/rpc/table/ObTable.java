@@ -26,7 +26,6 @@ import com.alipay.oceanbase.rpc.checkandmutate.CheckAndInsUp;
 import com.alipay.oceanbase.rpc.exception.*;
 import com.alipay.oceanbase.rpc.filter.ObTableFilter;
 import com.alipay.oceanbase.rpc.location.model.ObServerAddr;
-import com.alipay.oceanbase.rpc.location.model.RouteTableRefresher;
 import com.alipay.oceanbase.rpc.mutation.*;
 import com.alipay.oceanbase.rpc.protocol.payload.ObPayload;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.*;
@@ -51,6 +50,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 
 import static com.alipay.oceanbase.rpc.property.Property.*;
 
@@ -68,6 +68,7 @@ public class ObTable extends AbstractObTable implements Lifecycle {
     private ObTableRemoting       realClient;
     private ObTableConnectionPool connectionPool;
     private ObServerAddr          addr; // just used in background keep-alive
+    private Consumer<ObServerAddr> failureHandler;
 
     private ObTableServerCapacity serverCapacity = new ObTableServerCapacity();
     
@@ -526,8 +527,13 @@ public class ObTable extends AbstractObTable implements Lifecycle {
 
     private void dealWithReconnectFailForObTableConnection() throws InterruptedException {
         setDirty();
-        RouteTableRefresher.SuspectObServer suspectAddr = new RouteTableRefresher.SuspectObServer(addr);
-        RouteTableRefresher.addIntoSuspectIPs(suspectAddr);
+        reportConnectionFailure();
+    }
+
+    public void reportConnectionFailure() {
+        if (failureHandler != null && addr != null) {
+            failureHandler.accept(addr);
+        }
     }
 
     private void checkObTableOperationResult(String ip, int port, Object result) {
@@ -747,6 +753,7 @@ public class ObTable extends AbstractObTable implements Lifecycle {
         private String       password;
         private String       database;
         private ObServerAddr addr = null; // only used in background keep-alive
+        private Consumer<ObServerAddr> failureHandler;
         ObTableClientType    clientType;
 
         private Properties   properties = new Properties();
@@ -806,6 +813,11 @@ public class ObTable extends AbstractObTable implements Lifecycle {
             return this;
         }
 
+        public Builder setFailureHandler(Consumer<ObServerAddr> failureHandler) {
+            this.failureHandler = failureHandler;
+            return this;
+        }
+
         /*
          * Build.
          */
@@ -822,6 +834,7 @@ public class ObTable extends AbstractObTable implements Lifecycle {
             obTable.setClientType(clientType);
             obTable.setIsOdpMode(isOdpMode);
             obTable.setObServerAddr(addr);
+            obTable.failureHandler = failureHandler;
 
             obTable.init();
 

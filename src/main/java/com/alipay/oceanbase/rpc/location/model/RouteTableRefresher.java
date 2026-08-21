@@ -22,13 +22,13 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.exception.ObTableEntryRefreshException;
 import com.alipay.oceanbase.rpc.exception.ObTableTryLockTimeoutException;
-import com.alipay.oceanbase.rpc.exception.ObTableUnexpectedException;
 import com.alipay.oceanbase.rpc.location.LocationUtil;
 import com.alipay.oceanbase.rpc.table.ObTable;
 import org.slf4j.Logger;
@@ -49,11 +49,15 @@ public class RouteTableRefresher {
 
     private final ScheduledExecutorService                                scheduler = Executors.newScheduledThreadPool(2);
 
-    private final static ConcurrentHashMap<ObServerAddr, Lock>            suspectLocks = new ConcurrentHashMap<>(); // ObServer -> access lock
+    private final ConcurrentHashMap<ObServerAddr, Lock>                   suspectLocks = new ConcurrentHashMap<>(); // ObServer -> access lock
 
-    private final static ConcurrentHashMap<ObServerAddr, SuspectObServer> suspectServers = new ConcurrentHashMap<>(); // ObServer -> information structure
+    private final ConcurrentHashMap<ObServerAddr, SuspectObServer>        suspectServers = new ConcurrentHashMap<>(); // ObServer -> information structure
 
-    private final static HashMap<ObServerAddr, Long>                      serverLastAccessTimestamps = new HashMap<>(); // ObServer -> last access timestamp
+    private final ConcurrentHashMap<ObServerAddr, Long>                   serverLastAccessTimestamps = new ConcurrentHashMap<>(); // ObServer -> last access timestamp
+
+    private final Set<ObServerAddr>                                       activeServers = ConcurrentHashMap.newKeySet();
+
+    private final AtomicBoolean                                           closed = new AtomicBoolean(false);
 
     public RouteTableRefresher(ObTableClient tableClient, ObUserAuth sysUA) {
         this.tableClient = tableClient;
@@ -70,6 +74,9 @@ public class RouteTableRefresher {
     }
 
     public void close() {
+        if (!closed.compareAndSet(false, true)) {
+            return;
+        }
         try {
             scheduler.shutdown();
             // wait at most 1 seconds to close the scheduler
@@ -79,6 +86,39 @@ public class RouteTableRefresher {
         } catch (InterruptedException e) {
             logger.warn("scheduler await for terminate interrupted: {}.", e.getMessage());
             scheduler.shutdownNow();
+            Thread.currentThread().interrupt();
+        } finally {
+            suspectServers.clear();
+            suspectLocks.clear();
+            serverLastAccessTimestamps.clear();
+            activeServers.clear();
+        }
+    }
+
+    /**
+     * Reconcile the keep-alive state with the latest authoritative tenant roster.
+     * Servers removed from the roster must not remain in, or be re-added to, the suspect set.
+     */
+    public void refreshActiveServers(Collection<ObServerAddr> servers) {
+        if (closed.get()) {
+            return;
+        }
+        Set<ObServerAddr> newServers = new HashSet<>();
+        if (servers != null) {
+            newServers.addAll(servers);
+        }
+        activeServers.retainAll(newServers);
+        activeServers.addAll(newServers);
+
+        for (ObServerAddr addr : suspectServers.keySet()) {
+            if (!newServers.contains(addr)) {
+                removeFromSuspectIPs(addr);
+            }
+        }
+        for (ObServerAddr addr : serverLastAccessTimestamps.keySet()) {
+            if (!newServers.contains(addr)) {
+                serverLastAccessTimestamps.remove(addr);
+            }
         }
     }
 
@@ -127,6 +167,10 @@ public class RouteTableRefresher {
     private void doCheckAliveTask() {
         for (Map.Entry<ObServerAddr, SuspectObServer> entry : suspectServers.entrySet()) {
             try {
+                if (!activeServers.contains(entry.getKey())) {
+                    removeFromSuspectIPs(entry.getKey());
+                    continue;
+                }
                 checkAlive(entry.getKey());
             } catch (Exception e) {
                 // silence resolving
@@ -161,7 +205,7 @@ public class RouteTableRefresher {
             if (t instanceof SQLException) {
                 // occurred during query
                 calcFailureOrClearCache(addr);
-            } if (t instanceof ObTableEntryRefreshException) {
+            } else if (t instanceof ObTableEntryRefreshException) {
                 // occurred during connection construction
                 ObTableEntryRefreshException e = (ObTableEntryRefreshException) t;
                 if (e.isConnectInactive()) {
@@ -192,11 +236,22 @@ public class RouteTableRefresher {
         }
     }
 
-    public static void addIntoSuspectIPs(SuspectObServer server) throws InterruptedException {
+    public void addIntoSuspectIPs(ObServerAddr addr) {
+        if (addr == null) {
+            return;
+        }
+        addIntoSuspectIPs(new SuspectObServer(addr));
+    }
+
+    private void addIntoSuspectIPs(SuspectObServer server) {
         if (server == null || server.getAddr() == null) {
             return;
         }
         ObServerAddr addr = server.getAddr();
+        if (closed.get() || !activeServers.contains(addr)) {
+            logger.debug("ignore suspect report for inactive server: {}", addr);
+            return;
+        }
         if (suspectServers.get(addr) != null) {
             // already in the list, directly return
             return;
@@ -218,6 +273,9 @@ public class RouteTableRefresher {
                         // already in the list, directly break
                         break;
                     }
+                    if (closed.get() || !activeServers.contains(addr)) {
+                        break;
+                    }
                     Long lastServerAccessTs = serverLastAccessTimestamps.get(addr);
                     if (lastServerAccessTs != null) {
                         long interval = System.currentTimeMillis() - lastServerAccessTs;
@@ -235,6 +293,11 @@ public class RouteTableRefresher {
                     ++retryTimes;
                     logger.warn("wait to try lock to timeout 1s when add observer into suspect ips, server: {}, tryTimes: {}",
                             addr.toString(), retryTimes, e);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    logger.debug("interrupted while adding observer into suspect ips, server: {}",
+                        addr);
+                    break;
                 }
             } // end while
         } finally {
@@ -247,43 +310,33 @@ public class RouteTableRefresher {
     private void removeFromSuspectIPs(ObServerAddr addr) {
         Lock lock = suspectLocks.get(addr);
         if (lock == null) {
-            // lock must have been added before remove
-            throw new ObTableUnexpectedException(String.format("ObServer [%s:%d] need to be add into suspect ips before remove",
-                    addr.getIp(), addr.getSvrPort()));
+            suspectServers.remove(addr);
+            logger.debug("suspect server has already been removed: {}", addr);
+            return;
         }
         boolean acquired = false;
         try {
-            int retryTimes = 0;
-            while (true) {
-                try {
-                    acquired = lock.tryLock(1, TimeUnit.SECONDS);
-                    if (!acquired) {
-                        throw new ObTableTryLockTimeoutException("try to get suspect server lock timeout, timeout: 1s");
+            acquired = lock.tryLock(1, TimeUnit.SECONDS);
+            if (!acquired) {
+                logger.debug("defer suspect removal because lock is busy, server: {}", addr);
+                return;
+            }
+            // Keep the lock and cooldown entry until this refresher closes. This prevents a
+            // concurrent add from using a different lock and preserves the existing cooldown.
+            SuspectObServer server = suspectServers.remove(addr);
+            if (server != null) {
+                int failure = server.getFailure();
+                if (failure < failureLimit && activeServers.contains(addr)) {
+                    ObTable obTable = tableClient.getTableRoute().getTableRoster().getTable(addr);
+                    if (obTable != null && !obTable.isValid()) {
+                        obTable.setValid();
                     }
-                    // no need to remove lock
-                    SuspectObServer server = suspectServers.remove(addr);
-                    if (server != null) {
-                        int failure = server.getFailure();
-                        if (failure < failureLimit) {
-                            ObTable obTable = tableClient.getTableRoute().getTableRoster().getTable(addr);
-                            if (obTable != null && !obTable.isValid()) {
-                                obTable.setValid();
-                            }
-                        }
-                    }
-                    logger.debug("removed server from suspect list: {}", addr);
-                    break;
-                } catch (ObTableTryLockTimeoutException e) {
-                    // if try lock timeout, need to retry
-                    ++retryTimes;
-                    logger.warn("wait to try lock to timeout when add observer into suspect ips, server: {}, tryTimes: {}",
-                            addr.toString(), retryTimes, e);
-                } catch (InterruptedException e) {
-                    // do not throw exception to user layer
-                    // next background task will continue to remove it
-                    logger.warn("waiting to get lock while interrupted by other threads", e);
                 }
             }
+            logger.debug("removed server from suspect list: {}", addr);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.debug("interrupted while removing observer from suspect ips, server: {}", addr);
         } finally {
             if (acquired) {
                 lock.unlock();
@@ -294,6 +347,10 @@ public class RouteTableRefresher {
     private void calcFailureOrClearCache(ObServerAddr addr) {
         TableRoute tableRoute = tableClient.getTableRoute();
         SuspectObServer server = suspectServers.get(addr);
+        if (server == null) {
+            logger.debug("skip failure calculation for removed suspect server: {}", addr);
+            return;
+        }
         server.incrementFailure();
         int failure = server.getFailure();
         if (failure >= failureLimit) {
@@ -302,6 +359,18 @@ public class RouteTableRefresher {
         }
         logger.debug("background keep-alive mechanic failed to receive response, server: {}, failure: {}",
                 addr, failure);
+    }
+
+    int suspectServerCount() {
+        return suspectServers.size();
+    }
+
+    boolean containsSuspectServer(ObServerAddr addr) {
+        return suspectServers.containsKey(addr);
+    }
+
+    int lastAccessTimestampCount() {
+        return serverLastAccessTimestamps.size();
     }
 
     public static class SuspectObServer {
