@@ -944,7 +944,8 @@ public class ObTableClient extends AbstractObTableClient implements Lifecycle {
             logger.info("server from response not exist in route cache, server ip {}, port {} , execute add Table.", addr.getIp(), addr.getSvrPort());
             ObTable obTable = new ObTable.Builder(addr.getIp(), addr.getSvrPort()) //
                     .setLoginInfo(tenantName, userName, password, database, getClientType(runningMode)) //
-                    .setProperties(getProperties()).setObServerAddr(addr).build();
+                    .setProperties(getProperties()).setObServerAddr(addr)
+                    .setFailureHandler(tableRoute::reportObServerFailure).build();
             tableRoster.put(addr, obTable);
             return obTable;
         } catch (Exception e) {
@@ -983,14 +984,12 @@ public class ObTableClient extends AbstractObTableClient implements Lifecycle {
     }
 
     public void dealWithRpcTimeoutForSingleTablet(ObServerAddr addr, String tableName, long tabletId) throws Exception {
-        RouteTableRefresher.SuspectObServer suspectAddr = new RouteTableRefresher.SuspectObServer(addr);
-        RouteTableRefresher.addIntoSuspectIPs(suspectAddr);
+        tableRoute.reportObServerFailure(addr);
         tableRoute.refreshPartitionLocation(tableName, tabletId, null);
     }
 
     public void dealWithRpcTimeoutForBatchTablet(ObServerAddr addr, String tableName) throws Exception {
-        RouteTableRefresher.SuspectObServer suspectAddr = new RouteTableRefresher.SuspectObServer(addr);
-        RouteTableRefresher.addIntoSuspectIPs(suspectAddr);
+        tableRoute.reportObServerFailure(addr);
         tableRoute.refreshTabletLocationBatch(tableName);
     }
 
